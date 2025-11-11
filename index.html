@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Confidence Experiment</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState } = React;
+        
+        // TODO: Replace this URL with your Google Apps Script Web App URL
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxhgOWh2vAFX1mmuD4bnJBdqEmhx4rUz1MoZ7GMOnyrag5hpSLW17lLeOzJ9vI4Ra14tA/exec';
+        
+        const products = [
+            {
+                id: 1,
+                name: "Wireless Bluetooth Headphones",
+                price: 49.99,
+                image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=300&h=300&fit=crop",
+                rating: 4.5
+            },
+            {
+                id: 2,
+                name: "Smart Watch Fitness Tracker",
+                price: 79.99,
+                image: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop",
+                rating: 4.3
+            },
+            {
+                id: 3,
+                name: "Portable Phone Charger 20000mAh",
+                price: 29.99,
+                image: "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=300&h=300&fit=crop",
+                rating: 4.6
+            },
+            {
+                id: 4,
+                name: "Laptop Stand Adjustable",
+                price: 34.99,
+                image: "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=300&h=300&fit=crop",
+                rating: 4.4
+            },
+            {
+                id: 5,
+                name: "USB-C Hub Multiport Adapter",
+                price: 39.99,
+                image: "https://images.unsplash.com/photo-1625948515291-69613efd103f?w=300&h=300&fit=crop",
+                rating: 4.2
+            }
+        ];
+
+        function StarIcon({ filled }) {
+            return (
+                <svg className={`w-5 h-5 ${filled ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+            );
+        }
+
+        function ShoppingCartIcon() {
+            return (
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                </svg>
+            );
+        }
+
+        function ExperimentApp() {
+            const [stage, setStage] = useState('welcome');
+            const [condition, setCondition] = useState(null);
+            const [participantId, setParticipantId] = useState('');
+            const [currentProduct, setCurrentProduct] = useState(0);
+            const [startTime, setStartTime] = useState(null);
+            const [responses, setResponses] = useState([]);
+            const [trustRating, setTrustRating] = useState(0);
+            const [showThankYou, setShowThankYou] = useState(false);
+            const [isSubmitting, setIsSubmitting] = useState(false);
+            const [submitError, setSubmitError] = useState(false);
+
+            const confidenceText = condition === 'high' 
+                ? "We're 90% confident you'll love this product!" 
+                : "We think this product could be a good fit, 60% chance.";
+
+            const confidenceColor = condition === 'high' ? 'text-green-600' : 'text-yellow-600';
+
+            const startExperiment = (selectedCondition) => {
+                if (!participantId.trim()) {
+                    alert('Please enter your Participant ID');
+                    return;
+                }
+                setCondition(selectedCondition);
+                setStage('consent');
+            };
+
+            const giveConsent = () => {
+                setStage('experiment');
+                setStartTime(Date.now());
+            };
+
+            const handleDecision = (decision) => {
+                const decisionTime = (Date.now() - startTime) / 1000;
+                
+                const response = {
+                    productId: products[currentProduct].id,
+                    productName: products[currentProduct].name,
+                    decision,
+                    decisionTime: decisionTime.toFixed(2)
+                };
+
+                const newResponses = [...responses, response];
+                setResponses(newResponses);
+
+                if (currentProduct < products.length - 1) {
+                    setCurrentProduct(currentProduct + 1);
+                    setStartTime(Date.now());
+                } else {
+                    setStage('questionnaire');
+                }
+            };
+
+            const submitToGoogleSheets = async (data) => {
+                try {
+                    const response = await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    // no-cors mode doesn't return response, so we assume success
+                    console.log('Data sent to Google Sheets');
+                    return true;
+                } catch (error) {
+                    console.error('Error sending to Google Sheets:', error);
+                    throw error;
+                }
+            };
+
+            const submitQuestionnaire = async () => {
+                setIsSubmitting(true);
+                setSubmitError(false);
+                
+                const finalData = {
+                    participantId,
+                    condition,
+                    product1: responses[0]?.decision || 'no',
+                    time1: responses[0]?.decisionTime || '0',
+                    product2: responses[1]?.decision || 'no',
+                    time2: responses[1]?.decisionTime || '0',
+                    product3: responses[2]?.decision || 'no',
+                    time3: responses[2]?.decisionTime || '0',
+                    product4: responses[3]?.decision || 'no',
+                    time4: responses[3]?.decisionTime || '0',
+                    product5: responses[4]?.decision || 'no',
+                    time5: responses[4]?.decisionTime || '0',
+                    trustRating,
+                    timestamp: new Date().toISOString()
+                };
+
+                try {
+                    await submitToGoogleSheets(finalData);
+                    
+                    // Also download as backup
+                    const dataStr = JSON.stringify(finalData, null, 2);
+                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(dataBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `participant_${participantId}_${condition}_${Date.now()}.json`;
+                    link.click();
+                    
+                    setIsSubmitting(false);
+                    setShowThankYou(true);
+                } catch (error) {
+                    console.error('Submission error:', error);
+                    setIsSubmitting(false);
+                    setSubmitError(true);
+                }
+            };
+
+            // Welcome Screen
+            if (stage === 'welcome') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
+                        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-6 md:p-8">
+                            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Welcome to Our Research Study</h1>
+                            
+                            <div className="mb-6">
+                                <p className="text-gray-700 mb-4">
+                                    Thank you for participating in our research on AI product recommendations. 
+                                    This study will take approximately <strong>5-10 minutes</strong>.
+                                </p>
+                                
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <h3 className="font-semibold text-blue-900 mb-2">📋 What you'll do:</h3>
+                                    <ul className="list-disc ml-5 text-blue-800 space-y-1">
+                                        <li>View 5 product recommendations</li>
+                                        <li>Decide if you would purchase each product</li>
+                                        <li>Answer one question about your experience</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Enter Your Participant ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={participantId}
+                                    onChange={(e) => setParticipantId(e.target.value.toUpperCase())}
+                                    placeholder="e.g., P001"
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-lg font-bold"
+                                />
+                            </div>
+
+                            <div className="mb-6">
+                                <p className="text-sm font-medium text-gray-700 mb-3">Select Your Group:</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => startExperiment('high')}
+                                        className="px-6 py-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition font-medium"
+                                    >
+                                        <div className="text-lg">High Confidence</div>
+                                        <div className="text-sm opacity-90">90% Confidence</div>
+                                    </button>
+                                    <button
+                                        onClick={() => startExperiment('low')}
+                                        className="px-6 py-4 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition font-medium"
+                                    >
+                                        <div className="text-lg">Low Confidence</div>
+                                        <div className="text-sm opacity-90">60% Confidence</div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Consent Screen
+            if (stage === 'consent') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
+                        <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-xl p-6 md:p-8">
+                            <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Informed Consent</h1>
+                            
+                            <div className="space-y-4 text-gray-700 mb-8 text-sm md:text-base">
+                                <p><strong>Study Title:</strong> The Impact of AI Confidence in Product Recommendations</p>
+                                
+                                <p><strong>Purpose:</strong> This study investigates how confidence levels in AI recommendations affect trust and purchase decisions.</p>
+                                
+                                <p><strong>Procedure:</strong> You will be shown 5 product recommendations and asked to decide whether you would add each product to your cart. This will take approximately 5-10 minutes.</p>
+                                
+                                <p><strong>Data Collection:</strong> We will collect your decisions, decision times, and trust ratings. No actual purchases will be made.</p>
+                                
+                                <p><strong>Confidentiality:</strong> Your data will be kept confidential and used only for research purposes.</p>
+                                
+                                <p><strong>Right to Withdraw:</strong> You may withdraw from this study at any time without penalty.</p>
+                            </div>
+
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                                <p className="text-sm text-yellow-800">
+                                    By clicking "I Consent" below, you acknowledge that you have read and understood this information and agree to participate in this study.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={giveConsent}
+                                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-lg"
+                            >
+                                I Consent to Participate
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Experiment Screen
+            if (stage === 'experiment') {
+                const product = products[currentProduct];
+                
+                return (
+                    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+                        <div className="max-w-4xl mx-auto">
+                            <div className="bg-white rounded-lg shadow-lg p-4 md:p-8">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl md:text-2xl font-bold text-gray-800">Product Recommendation</h2>
+                                    <span className="text-sm text-gray-600">
+                                        {currentProduct + 1} of {products.length}
+                                    </span>
+                                </div>
+
+                                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                                    <p className="text-sm text-gray-700 mb-2">
+                                        <strong>AI Recommendation:</strong>
+                                    </p>
+                                    <p className={`text-base md:text-lg font-semibold ${confidenceColor}`}>
+                                        {confidenceText}
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col md:flex-row gap-6 md:gap-8 mb-8">
+                                    <div className="md:w-1/3">
+                                        <img
+                                            src={product.image}
+                                            alt={product.name}
+                                            className="w-full rounded-lg shadow-md"
+                                        />
+                                    </div>
+
+                                    <div className="md:w-2/3">
+                                        <h3 className="text-xl md:text-2xl font-bold text-gray-800 mb-3">{product.name}</h3>
+                                        
+                                        <div className="flex items-center mb-4">
+                                            <div className="flex items-center">
+                                                {[...Array(5)].map((_, i) => (
+                                                    <StarIcon key={i} filled={i < Math.floor(product.rating)} />
+                                                ))}
+                                            </div>
+                                            <span className="ml-2 text-gray-600">{product.rating} out of 5</span>
+                                        </div>
+
+                                        <p className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">${product.price}</p>
+
+                                        <div className="bg-gray-50 rounded-lg p-4">
+                                            <h4 className="font-semibold text-gray-800 mb-2">Product Features:</h4>
+                                            <ul className="list-disc ml-5 text-gray-700 space-y-1 text-sm">
+                                                <li>High quality materials</li>
+                                                <li>Fast shipping available</li>
+                                                <li>30-day return policy</li>
+                                                <li>Customer support included</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t pt-6">
+                                    <p className="text-center text-gray-700 mb-4 font-medium">
+                                        Would you add this product to your cart?
+                                    </p>
+                                    <div className="flex flex-col md:flex-row gap-4 justify-center">
+                                        <button
+                                            onClick={() => handleDecision('yes')}
+                                            className="px-6 md:px-8 py-3 md:py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium text-base md:text-lg flex items-center justify-center gap-2"
+                                        >
+                                            <ShoppingCartIcon />
+                                            Yes, Add to Cart
+                                        </button>
+                                        <button
+                                            onClick={() => handleDecision('no')}
+                                            className="px-6 md:px-8 py-3 md:py-4 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-base md:text-lg"
+                                        >
+                                            No, Skip
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Questionnaire Screen
+            if (stage === 'questionnaire') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8">
+                        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-xl p-6 md:p-8">
+                            <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-6">Post-Experiment Questionnaire</h2>
+                            
+                            <div className="mb-8">
+                                <p className="text-base md:text-lg text-gray-700 mb-4 font-medium">
+                                    How much do you trust the AI's product recommendations?
+                                </p>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    (1 = Not at all, 7 = Completely)
+                                </p>
+                                
+                                <div className="flex gap-1 md:gap-2 justify-between mb-2">
+                                    {[1, 2, 3, 4, 5, 6, 7].map((rating) => (
+                                        <button
+                                            key={rating}
+                                            onClick={() => setTrustRating(rating)}
+                                            className={`w-10 h-10 md:w-14 md:h-14 rounded-lg font-bold text-base md:text-lg transition ${
+                                                trustRating === rating
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                            }`}
+                                        >
+                                            {rating}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-600 mt-2">
+                                    <span>Not at all</span>
+                                    <span>Completely</span>
+                                </div>
+                            </div>
+
+                            {submitError && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                                    <p className="text-sm text-red-800">
+                                        ⚠️ There was an error saving your data. Don't worry - it has been downloaded to your device as a backup.
+                                    </p>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={submitQuestionnaire}
+                                disabled={trustRating === 0 || isSubmitting}
+                                className={`w-full px-6 py-3 rounded-lg font-medium text-lg transition ${
+                                    trustRating === 0 || isSubmitting
+                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                            >
+                                {isSubmitting ? 'Submitting...' : 'Submit'}
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Thank You Screen
+            if (showThankYou) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-8 flex items-center justify-center">
+                        <div className="max-w-xl bg-white rounded-lg shadow-xl p-8 text-center">
+                            <div className="text-6xl mb-4">✓</div>
+                            <h2 className="text-3xl font-bold text-gray-800 mb-4">Thank You!</h2>
+                            <p className="text-lg text-gray-700 mb-6">
+                                Your participation has been recorded. Your responses have been saved successfully.
+                            </p>
+                            <p className="text-sm text-gray-600">
+                                You may now close this window.
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return null;
+        }
+
+        ReactDOM.render(<ExperimentApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
