@@ -171,13 +171,13 @@
                     await submitToGoogleSheets(finalData);
                     
                     // Also download as backup
-                    const dataStr = JSON.stringify(finalData, null, 2);
-                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                    const url = URL.createObjectURL(dataBlob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `participant_${participantId}_${condition}_${Date.now()}.json`;
-                    link.click();
+                    // const dataStr = JSON.stringify(finalData, null, 2);
+                    // const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                    // const url = URL.createObjectURL(dataBlob);
+                    // const link = document.createElement('a');
+                    // link.href = url;
+                    // link.download = `participant_${participantId}_${condition}_${Date.now()}.json`;
+                    // link.click();
                     
                     setIsSubmitting(false);
                     setShowThankYou(true);
@@ -371,6 +371,24 @@
                 );
             }
 
+            // Thank You Screen
+            if (showThankYou) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-8 flex items-center justify-center">
+                        <div className="max-w-xl bg-white rounded-lg shadow-xl p-8 text-center">
+                            <div className="text-6xl mb-4">✓</div>
+                            <h2 className="text-3xl font-bold text-gray-800 mb-4">Thank You!</h2>
+                            <p className="text-lg text-gray-700 mb-6">
+                                Your participation has been recorded. Your responses have been saved successfully.
+                            </p>
+                            <p className="text-sm text-gray-600">
+                                You may now close this window.
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+
             // Questionnaire Screen
             if (stage === 'questionnaire') {
                 return (
@@ -433,23 +451,7 @@
                 );
             }
 
-            // Thank You Screen
-            if (showThankYou) {
-                return (
-                    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-8 flex items-center justify-center">
-                        <div className="max-w-xl bg-white rounded-lg shadow-xl p-8 text-center">
-                            <div className="text-6xl mb-4">✓</div>
-                            <h2 className="text-3xl font-bold text-gray-800 mb-4">Thank You!</h2>
-                            <p className="text-lg text-gray-700 mb-6">
-                                Your participation has been recorded. Your responses have been saved successfully.
-                            </p>
-                            <p className="text-sm text-gray-600">
-                                You may now close this window.
-                            </p>
-                        </div>
-                    </div>
-                );
-            }
+            
 
             return null;
         }
